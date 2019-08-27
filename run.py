@@ -8,54 +8,54 @@ import logging
 import os
 
 
+def transform_cluster_name(cluster):
+    """ Transform EKS name to match name as exists in Git path """
+    remapped_cluster_names = {
+        'eks-cicd': 'cicd',
+        'eks-cicd-test': 'cicd-test',
+    }
+    if cluster in remapped_cluster_names:
+        return remapped_cluster_names[cluster]
+    else:
+        return cluster
+
+
 def find_avenger_role(cluster):
-    AOK = Fore.GREEN + '✓' + Style.RESET_ALL
-    NOK = Fore.RED + '✗' + Style.RESET_ALL
-    UNK = Fore.YELLOW + '✗ (no config found)' + Style.RESET_ALL
+    AOK = f'{Fore.GREEN}✓{Style.RESET_ALL}'
+    NOK = f'{Fore.RED}✗{Style.RESET_ALL}'
+    UNK = f'{Fore.YELLOW}?{Style.RESET_ALL}'
 
-    ROLE = "arn:aws:iam::914375995788:role/TheAvengers"
-
+    cluster = transform_cluster_name(cluster)
     status = NOK
-    kubeconfig = os.path.join(
-        os.environ['HOME'],
-        'src/git/videoamp/k8s-cluster-configs',
-        f'prod-use1/{cluster}/config')
+
+    kubeconfig = os.path.join(os.getcwd(), 'prod-use1', cluster, 'config')
+    logging.debug(kubeconfig)
     try:
         kubernetes.config.load_kube_config(config_file=kubeconfig)
-        api_instance = kubernetes.client.CoreV1Api()
+        k8s_client = kubernetes.client.CoreV1Api()
         try:
-            api_response = api_instance.list_config_map_for_all_namespaces(
+            aws_auth = k8s_client.list_config_map_for_all_namespaces(
                 field_selector='metadata.name=aws-auth')
-            if api_response and len(api_response.items) > 0:
-                mapRoles = api_response.items[0].data['mapRoles']
-                if ROLE in mapRoles:
+            if aws_auth and len(aws_auth.items) > 0:
+                mapRoles = aws_auth.items[0].data['mapRoles']
+                if "arn:aws:iam::914375995788:role/TheAvengers" in mapRoles:
                     status = AOK
         except Exception as e:
-            logging.error(e)    # some other error
+            logging.error(e)
     except Exception:
-        status = UNK    # config not found
+        status = UNK
     print(f'{cluster:20} {status}')
 
 
 def main():
     """ Loop through all EKS clusters reported by AWS via Boto """
     boto = boto3.client('eks', region_name='us-east-1')
-    clusters = boto.list_clusters()['clusters']
-
-    # transform cluster names that are different than their git repo path
-    cluster_transforms = {
-        'eks-cicd': 'cicd',
-        'eks-cicd-test': 'cicd-test',
-    }
-
-    for cluster in clusters:
-        if cluster in cluster_transforms:
-            find_avenger_role(cluster_transforms[cluster])
-        else:
-            find_avenger_role(cluster)
+    for cluster in boto.list_clusters()['clusters']:
+        find_avenger_role(cluster)
 
 
 if __name__ == "__main__":
     os.environ['AWS_PROFILE'] = 'avenger'
-    logging.disable()
+    os.chdir('/Users/michael/src/git/videoamp/k8s-cluster-configs')
+    logging.basicConfig(level=logging.CRITICAL)
     main()
