@@ -67,7 +67,7 @@ def find_avenger_role(cluster):
                 field_selector='metadata.name=aws-auth')
             if aws_auth and len(aws_auth.items) > 0:
                 mapRoles = aws_auth.items[0].data['mapRoles']
-                if "arn:aws:iam::914375995788:role/TheAvengers" in mapRoles:
+                if args.role in mapRoles:
                     status = AOK
         except Exception as e:
             logging.error(e)
