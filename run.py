@@ -2,10 +2,38 @@
 
 from colorama import Fore, Style
 
+import argparse
 import boto3
 import kubernetes
 import logging
 import os
+
+
+def do_parse_args():
+    parser = argparse.ArgumentParser(
+        description='Check EKS clusters for role-based access.')
+
+    parser.add_argument(
+        '-g', '--git_repo_path',
+        default='/Users/michael/src/git/videoamp/k8s-cluster-configs',
+        help='Path to local root of k8s-cluster-configs repo')
+
+    parser.add_argument(
+        '-v', '--verbose',
+        default=False,
+        help='Enable verbose logging')
+
+    parser.add_argument(
+        '-p', '--profile',
+        default='avenger',
+        help='Profile to assume when accessing clusters')
+
+    parser.add_argument(
+        '-r', '--role',
+        default='arn:aws:iam::914375995788:role/TheAvengers',
+        help='ARN of the role to check for')
+
+    return parser.parse_args()
 
 
 def transform_cluster_name(cluster):
@@ -21,6 +49,7 @@ def transform_cluster_name(cluster):
 
 
 def find_avenger_role(cluster):
+    """ Does role/TheAvenger appear in the mapRoles section of aws-auth? """
     AOK = f'{Fore.GREEN}✓{Style.RESET_ALL}'
     NOK = f'{Fore.RED}✗{Style.RESET_ALL}'
     UNK = f'{Fore.YELLOW}?{Style.RESET_ALL}'
@@ -55,7 +84,12 @@ def main():
 
 
 if __name__ == "__main__":
-    os.environ['AWS_PROFILE'] = 'avenger'
-    os.chdir('/Users/michael/src/git/videoamp/k8s-cluster-configs')
-    logging.basicConfig(level=logging.CRITICAL)
+    args = do_parse_args()
+    os.environ['AWS_PROFILE'] = args.profile
+    os.chdir(args.git_repo_path)
+    if args.verbose:
+        logging.basicConfig(level=logging.DEBUG)
+    else:
+        # kubernetes calls to api endpoint gives verbose ERROR, squelch here
+        logging.basicConfig(level=logging.CRITICAL)
     main()
